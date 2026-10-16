@@ -1,9 +1,10 @@
-// Barkod Bulucu - Netlify fonksiyonu (v2)
-// Tek görev: şifreyi doğrulamak ve seçilen TEK kaynağı sunucu tarafında sorgulamak
-// (tarayıcılar bu kaynakları doğrudan okuyamaz: CORS). Puanlama sayfada yapılır.
+// Barkod Bulucu - Netlify fonksiyonu (v3)
+// Görev: şifreyi doğrulamak ve seçilen TEK kaynağı sunucu tarafında sorgulamak
+// (tarayıcılar bu kaynakları doğrudan okuyamaz: CORS). Puanlama ve karar sayfada yapılır.
 // Ortam değişkenleri (Netlify > Site configuration > Environment variables):
 //   SIFRE             -> siteyi kullanacakların gireceği şifre (zorunlu)
 //   EAN_SEARCH_TOKEN  -> EAN-Search.org API anahtarı (isteğe bağlı; yoksa o kaynak atlanır)
+//   ICECAT_USER       -> Icecat kullanıcı adı (isteğe bağlı; yoksa herkese açık "openicecat-live" kullanılır)
 const crypto = require("crypto");
 
 function barkodDuzelt(k) {
@@ -14,30 +15,41 @@ function barkodDuzelt(k) {
 async function getJson(url, ayar = {}) {
   let r;
   for (let deneme = 0; deneme < 2; deneme++) {
-    r = await fetch(url, { headers: { "User-Agent": "BarkodBulucu/2.0", Accept: "application/json" }, signal: AbortSignal.timeout(7000) });
+    r = await fetch(url, { headers: { "User-Agent": "BarkodBulucu/3.0", Accept: "application/json" }, signal: AbortSignal.timeout(7000) });
     if (r.status >= 500 && deneme === 0) { await new Promise((ok) => setTimeout(ok, 800)); continue; }   // geçici sunucu hatası: bir kez daha dene
     break;
   }
-  if (r.status === 404 && ayar.bos404) return null;     // UPCitemdb: sonuç yoksa 404 döner
+  if (ayar.bos4xx && (r.status === 404 || r.status === 400 || r.status === 422)) return null;   // "sonuç yok" anlamında
   if (!r.ok) throw new Error("HTTP " + r.status + (r.status === 429 ? " (limit doldu, biraz bekle)" : r.status >= 500 ? " (kaynak şu an yoğun, sonra tekrar dene)" : ""));
   return r.json();
 }
 
 const KAYNAKLAR = {
-  ean: async (q) => {
+  ean: async (p) => {
     const token = (process.env.EAN_SEARCH_TOKEN || "").trim();
     if (!token) return { atlandi: "EAN_SEARCH_TOKEN tanımlı değil (atlandı)" };
-    const v = await getJson("https://api.ean-search.org/api?" + new URLSearchParams({ token, op: "product-search", name: q, language: "99", format: "json" }));
+    const v = await getJson("https://api.ean-search.org/api?" + new URLSearchParams({ token, op: "product-search", name: p.q, language: "99", format: "json" }));
     if (v && v.error) throw new Error(String(v.error));
-    return { sonuclar: (Array.isArray(v) ? v : v.productlist || []).slice(0, 10).map((p) => ({ barkod: barkodDuzelt(p.ean), ad: p.name || "", marka: "" })) };
+    return { sonuclar: (Array.isArray(v) ? v : v.productlist || []).slice(0, 10).map((x) => ({ barkod: barkodDuzelt(x.ean), ad: x.name || "", marka: "" })) };
   },
-  upc: async (q) => {
-    const v = await getJson("https://api.upcitemdb.com/prod/trial/search?" + new URLSearchParams({ s: q, match_mode: "0", type: "product" }), { bos404: true });
+  upc: async (p) => {
+    const v = await getJson("https://api.upcitemdb.com/prod/trial/search?" + new URLSearchParams({ s: p.q, match_mode: "0", type: "product" }), { bos4xx: true });
     return { sonuclar: ((v && v.items) || []).slice(0, 10).map((i) => ({ barkod: barkodDuzelt(i.ean || i.upc), ad: i.title || "", marka: i.brand || "" })) };
   },
-  off: async (q) => {
-    const v = await getJson("https://world.openfoodfacts.org/cgi/search.pl?" + new URLSearchParams({ search_terms: q, search_simple: "1", action: "process", json: "1", page_size: "10", fields: "code,product_name,brands" }));
-    return { sonuclar: (v.products || []).map((p) => ({ barkod: barkodDuzelt(p.code), ad: p.product_name || "", marka: p.brands || "" })) };
+  off: async (p) => {
+    const v = await getJson("https://world.openfoodfacts.org/cgi/search.pl?" + new URLSearchParams({ search_terms: p.q, search_simple: "1", action: "process", json: "1", page_size: "10", fields: "code,product_name,brands" }));
+    return { sonuclar: (v.products || []).map((x) => ({ barkod: barkodDuzelt(x.code), ad: x.product_name || "", marka: x.brands || "" })) };
+  },
+  // Icecat: marka + üretici model kodu ile birebir arama (aramada bulanık eşleşme yok, bulursa kesindir)
+  icecat: async (p) => {
+    if (!p.marka || !p.kod) return { sonuclar: [] };
+    const user = (process.env.ICECAT_USER || "openicecat-live").trim();
+    const v = await getJson("https://live.icecat.biz/api?" + new URLSearchParams({ lang: "EN", shopname: user, Brand: p.marka, ProductCode: p.kod }), { bos4xx: true });
+    const g = v && v.data && v.data.GeneralInfo;
+    if (!g) return { sonuclar: [] };
+    const liste = [].concat(g.GTIN || []).map(barkodDuzelt).filter(Boolean);
+    const ad = g.Title || g.ProductName || ((g.Brand || "") + " " + (g.BrandPartCode || p.kod)).trim();
+    return { sonuclar: liste.slice(0, 5).map((b) => ({ barkod: b, ad, marka: g.Brand || p.marka, kesin: true })) };
   },
 };
 
@@ -57,10 +69,10 @@ exports.handler = async (event) => {
   const p = event.queryStringParameters || {};
   const kaynak = KAYNAKLAR[p.kaynak];
   if (!kaynak) return cevap(400, { hata: "Bilinmeyen kaynak." });
-  const q = (p.q || "").trim().slice(0, 200);
-  if (!q) return cevap(400, { hata: "Aranacak ürün adı boş." });
+  const girdi = { q: (p.q || "").trim().slice(0, 200), marka: (p.marka || "").trim().slice(0, 60), kod: (p.kod || "").trim().slice(0, 60) };
+  if (!girdi.q && !(girdi.marka && girdi.kod)) return cevap(400, { hata: "Aranacak ürün adı boş." });
   try {
-    return cevap(200, await kaynak(q));
+    return cevap(200, await kaynak(girdi));
   } catch (e) {
     return cevap(200, { hata: String((e && e.message) || e) });
   }
