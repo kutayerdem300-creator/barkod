@@ -44,21 +44,24 @@ function bingUrlCoz(h) {
 function ddgUrlCoz(h) {
   try { const u = new URL(htmlCoz(h), "https://duckduckgo.com"); const d = u.searchParams.get("uddg"); return d ? decodeURIComponent(d) : (u.hostname.includes("duckduckgo") ? "" : u.href); } catch (e) { return ""; }
 }
+const etiketsiz = (t) => htmlCoz(String(t || "").replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
 async function aramaSonuclari(sorgu, ms) {
-  const urls = [];
+  const liste = []; let motor = "";
   try {
     const html = await metinGetir("https://html.duckduckgo.com/html/?" + new URLSearchParams({ q: sorgu, kl: "tr-tr" }), ms);
-    for (const m of html.matchAll(/<a[^>]+class="[^"]*result__a[^"]*"[^>]*>/g)) { const h = /href="([^"]+)"/.exec(m[0]); if (h) { const u = ddgUrlCoz(h[1]); if (u) urls.push(u); } }
+    for (const m of html.matchAll(/<a([^>]+class="[^"]*result__a[^"]*"[^>]*)>([\s\S]*?)<\/a>/g)) { const h = /href="([^"]+)"/.exec(m[1]); if (h) { const u = ddgUrlCoz(h[1]); if (u) liste.push({ url: u, baslik: etiketsiz(m[2]) }); } }
+    if (liste.length) motor = "ddg";
   } catch (e) {}
-  if (urls.length < 3) {
+  if (liste.length < 3) {
     try {
-      const html = await metinGetir("https://www.bing.com/search?" + new URLSearchParams({ q: sorgu, setlang: "tr", cc: "TR" }), ms);
-      for (const m of html.matchAll(/<li class="b_algo"[\s\S]*?<h2[^>]*>\s*<a[^>]+href="([^"]+)"/g)) { const u = bingUrlCoz(m[1]); if (u) urls.push(u); }
+      const html = await metinGetir("https://www.bing.com/search?" + new URLSearchParams({ q: sorgu, setlang: "tr-TR", mkt: "tr-TR", cc: "TR" }), ms);
+      for (const m of html.matchAll(/<li class="b_algo"[\s\S]*?<h2[^>]*>\s*<a([^>]+)>([\s\S]*?)<\/a>/g)) { const h = /href="([^"]+)"/.exec(m[1]); if (h) { const u = bingUrlCoz(h[1]); if (u) liste.push({ url: u, baslik: etiketsiz(m[2]) }); } }
+      if (liste.length) motor = (motor ? motor + "+" : "") + "bing";
     } catch (e) {}
   }
   const gorulen = new Set(), sonuc = [];
-  for (const u of urls) { if (ATLA.test(u) || !/^https?:/.test(u)) continue; const d = new URL(u).hostname.replace(/^www\./, ""); const k = d + new URL(u).pathname; if (gorulen.has(k)) continue; gorulen.add(k); sonuc.push(u); }
-  return sonuc;
+  for (const r of liste) { if (ATLA.test(r.url) || !/^https?:/.test(r.url)) continue; let k; try { const x = new URL(r.url); k = x.hostname.replace(/^www\./, "") + x.pathname; } catch (e) { continue; } if (gorulen.has(k)) continue; gorulen.add(k); sonuc.push(r); }
+  return { sonuc, motor, ham: liste.length };
 }
 const alnum = (s) => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 // Sayfadan barkod adaylarını çıkarır: önce yapılandırılmış alanlar (JSON-LD, itemprop), yoksa "EAN/Barkod" etiketinin yanındaki sayı
@@ -90,9 +93,22 @@ async function webAra(p) {
   const bitis = Date.now() + 8200;
   const kalan = () => Math.max(500, bitis - Date.now());
   const kodlar = (p.kod ? p.kod.split(",") : []).map((x) => x.trim()).filter(Boolean);
-  const sorgu = kodlar.length ? ((p.marka ? p.marka + " " : "") + kodlar[0] + " ean barkod") : (p.q + " barkod ean");
-  const urls = (await aramaSonuclari(sorgu, 3500)).slice(0, 7);
-  if (!urls.length) throw new Error("Arama motoru sonuç vermedi (engellenmiş olabilir)");
+  const kelimeler = String(p.q || "").toLowerCase().replace(/[ıİ]/g, "i").replace(/[^a-z0-9ğüşöç ]+/g, " ").split(/\s+/).filter((w) => w.length >= 3);
+  const ilgili = (r) => {
+    const m = r.baslik + " " + r.url;
+    if (kodlar.length) return kodlar.some((k) => alnum(m).includes(alnum(k)));
+    const t = m.toLowerCase().replace(/[ıİ]/g, "i"); return kelimeler.length > 0 && kelimeler.filter((w) => t.includes(w)).length / kelimeler.length >= 0.6;
+  };
+  const sorgular = kodlar.length ? [((p.marka ? p.marka + " " : "") + '"' + kodlar[0] + '"'), ((p.marka ? p.marka + " " : "") + kodlar[0] + " barkod")] : [p.q + " barkod"];
+  const secilen = [], motorlar = [], gorulen = new Set(), tumBasliklar = [];
+  for (const sg of sorgular) {
+    if (secilen.length >= 5 || kalan() < 3500) break;
+    const { sonuc, motor, ham } = await aramaSonuclari(sg, 3000);
+    motorlar.push(motor || "yok(" + ham + ")");
+    for (const r of sonuc) { tumBasliklar.push(r.baslik.slice(0, 50)); if (!gorulen.has(r.url) && ilgili(r)) { gorulen.add(r.url); secilen.push(r); } }
+  }
+  const urls = secilen.slice(0, 6).map((r) => r.url);
+  if (!urls.length) return { sonuclar: [], bakilan: 0, motorlar, gorulenBasliklar: tumBasliklar.slice(0, 6), not: "Arama sonuçlarında bu ürünün sayfası görünmedi" };
   const ayrinti = [];
   const sayfalar = await Promise.all(urls.map(async (u) => {
     const h = new URL(u).hostname.replace(/^www\./, "");
@@ -112,7 +128,7 @@ async function webAra(p) {
   return {
     sonuclar: [...oy.entries()].map(([b, o]) => ({ barkod: barkodDuzelt(b), ad: o.baslik, marka: p.marka || "", web: { sayfa: o.alanlar.size, alanlar: [...o.alanlar].slice(0, 3), url: o.url, kodVar: kodlar.length > 0 } }))
       .sort((a, b) => b.web.sayfa - a.web.sayfa).slice(0, 5),
-    bakilan: urls.length, sorgu, ayrinti,
+    bakilan: urls.length, motorlar, ayrinti,
   };
 }
 
