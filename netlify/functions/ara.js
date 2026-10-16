@@ -93,8 +93,10 @@ async function webAra(p) {
   const sorgu = kodlar.length ? ((p.marka ? p.marka + " " : "") + kodlar[0] + " ean barkod") : (p.q + " barkod ean");
   const urls = (await aramaSonuclari(sorgu, 3500)).slice(0, 7);
   if (!urls.length) throw new Error("Arama motoru sonuç vermedi (engellenmiş olabilir)");
+  const ayrinti = [];
   const sayfalar = await Promise.all(urls.map(async (u) => {
-    try { const s = sayfaCoz(await metinGetir(u, Math.min(4500, kalan())), kodlar.length ? kodlar : [p.q], u, p.q); s.url = u; return s; } catch (e) { return null; }
+    const h = new URL(u).hostname.replace(/^www\./, "");
+    try { const s = sayfaCoz(await metinGetir(u, Math.min(4500, kalan())), kodlar.length ? kodlar : [p.q], u, p.q); s.url = u; ayrinti.push({ site: h, kodVar: s.kodVar, kapsam: Math.round(s.kapsam * 100) / 100, barkodlar: [...new Set(s.barkodlar)].length, baslik: s.baslik.slice(0, 60) }); return s; } catch (e) { ayrinti.push({ site: h, hata: String(e.message || e).slice(0, 40) }); return null; }
   }));
   const oy = new Map();
   for (const s of sayfalar) {
@@ -110,7 +112,7 @@ async function webAra(p) {
   return {
     sonuclar: [...oy.entries()].map(([b, o]) => ({ barkod: barkodDuzelt(b), ad: o.baslik, marka: p.marka || "", web: { sayfa: o.alanlar.size, alanlar: [...o.alanlar].slice(0, 3), url: o.url, kodVar: kodlar.length > 0 } }))
       .sort((a, b) => b.web.sayfa - a.web.sayfa).slice(0, 5),
-    bakilan: urls.length,
+    bakilan: urls.length, sorgu, ayrinti,
   };
 }
 
