@@ -58,6 +58,7 @@
     <div>
       <label title="Marka + üretici model koduyla birebir arar. Philips, Samsung gibi markalarda iyi."><input type="checkbox" class="kaynak" value="icecat" checked> Icecat (marka + model kodu)</label>
       <label title="Anahtar gerekir (Netlify'da EAN_SEARCH_TOKEN). Yoksa atlanır."><input type="checkbox" class="kaynak" value="ean" checked> EAN-Search</label>
+      <label title="Arama motorunda ürünü arar, sayfalardan barkodu okur. Internet kaynaklarının en geniş olanı."><input type="checkbox" class="kaynak" value="web" checked> İnternet sayfaları (Web)</label>
       <label title="Ücretsiz, günlük sınırlı, yavaş"><input type="checkbox" class="kaynak" value="upc" checked> UPCitemdb</label>
       <label title="Sadece gıda ürünleri için"><input type="checkbox" class="kaynak" value="off"> Open Food Facts (gıda)</label>
     </div>
@@ -221,6 +222,8 @@ const KAYNAK = {
       if (u.sorgu) { tum = await cagri("ean", { q: u.sorgu }); if (tum.some((r) => kodOrtak(u, r))) return tum; }
       return tum.concat(await cagri("ean", { q: u.ad }));
     } },
+  web: { ad: "Web", aralik: 1500, test: { q: "Tefal FV5735 ütü", marka: "Tefal", kod: "FV5735" },
+    async bul(u) { return cagri("web", { q: u.ad, marka: u.marka, kod: u.kodlar.join(",") }); } },
   upc: { ad: "UPCitemdb", aralik: 10500, test: { q: "nutella" },
     async bul(u) {
       let tum = [];
@@ -229,11 +232,12 @@ const KAYNAK = {
     } },
   off: { ad: "Open Food Facts", aralik: 6500, test: { q: "nutella" }, async bul(u) { return cagri("off", { q: u.ad }); } },
 };
-const SIRA = ["icecat", "ean", "upc", "off"];
+const SIRA = ["icecat", "ean", "web", "upc", "off"];
 
 // ---------- değerlendirme
 function degerlendir(u, r) {
   if (r.kesin) return { puan: 95, otomatikMumkun: true };
+  if (r.web) { const w = r.web; return w.kodVar ? { puan: w.sayfa >= 2 ? 92 : 80, otomatikMumkun: w.sayfa >= 2 } : { puan: w.sayfa >= 2 ? 65 : 55, otomatikMumkun: false }; }
   const s = skor(u.ad, (r.marka + " " + r.ad).trim()), rk = modelKodlari(r.marka + " " + r.ad), qk = new Set(u.kodlar);
   const tam = [...qk].some((k) => rk.has(k));
   const onek = !tam && [...qk].some((k) => k.length >= 6 && [...rk].some((c) => c.startsWith(k)));
@@ -246,7 +250,7 @@ function durumOf(puan, gecerli, otomatikMumkun) {
   if (puan >= 85 && gecerli && otomatikMumkun) return "Otomatik";
   return puan >= 55 ? "Kontrol et" : "Bulunamadı";
 }
-function aday(r, kaynak, puan, oto) { const gecerli = eanGecerli(r.barkod); return { barkod: r.barkod, ad: r.ad || "", marka: r.marka || "", kaynak, puan, otomatikMumkun: oto, gecerli, durum: durumOf(puan, gecerli, oto) }; }
+function aday(r, kaynak, puan, oto) { const gecerli = eanGecerli(r.barkod); return { barkod: r.barkod, ad: r.ad || "", marka: r.marka || "", kaynak, puan, otomatikMumkun: oto, gecerli, durum: durumOf(puan, gecerli, oto), url: (r.web && r.web.url) || "" }; }
 
 // ---------- hafıza ve tedarikçi listesi (tarayıcıda saklanır)
 let hafiza = {}, tedarik = [], kodIdx = new Map(), adIdx = new Map();
@@ -283,7 +287,7 @@ function tedarikAra(u) {
 // ---------- tek ürün için kademeli arama
 async function araUrun(ad, kaynaklar, durdur) {
   const u = urunCoz(ad), adaylar = new Map(), hatalar = new Set();
-  const ekle = (a) => { const v = adaylar.get(a.barkod); if (v) { v.kaynak += ", " + a.kaynak; if (a.puan > v.puan) Object.assign(v, { puan: a.puan, otomatikMumkun: a.otomatikMumkun, durum: a.durum }); } else adaylar.set(a.barkod, a); };
+  const ekle = (a) => { const v = adaylar.get(a.barkod); if (v) { v.kaynak += ", " + a.kaynak; if (a.puan > v.puan) Object.assign(v, { puan: a.puan, otomatikMumkun: a.otomatikMumkun, durum: a.durum, url: a.url || v.url }); } else adaylar.set(a.barkod, a); };
   const sirali = () => [...adaylar.values()].sort((a, b) => b.puan - a.puan || Number(b.gecerli) - Number(a.gecerli));
   const bitir = () => ({ sonuclar: sirali(), hatalar: [...hatalar], u });
 
@@ -300,12 +304,12 @@ async function araUrun(ad, kaynaklar, durdur) {
       for (const r of await KAYNAK[k].bul(u)) {
         if (!r.barkod || !r.ad) continue;
         const { puan, otomatikMumkun } = degerlendir(u, r);
-        ekle(aday(r, KAYNAK[k].ad, puan, otomatikMumkun));
+        ekle(aday(r, KAYNAK[k].ad + (r.web ? " (" + r.web.alanlar.join(", ") + ")" : ""), puan, otomatikMumkun));
       }
     } catch (e) {
       const m = String(e && e.message || e);
       hatalar.add(KAYNAK[k].ad + ": " + m);
-      if (/atlandı|limit doldu|Şifre yanlış|bulunamadı\./i.test(m)) kapali[k] = m;   // bu oturumda tekrar deneme
+      if (/atlandı|limit doldu|Şifre yanlış|bulunamadı\./i.test(m)) kapali[k] = m;   // bu oturumda tekrar deneme   // bu oturumda tekrar deneme
     }
     if (sirali().some((a) => a.durum === "Otomatik")) break;
   }
@@ -347,7 +351,7 @@ $("#aramaFormu").addEventListener("submit", async (e) => {
     hucre(tr, r.puan + " · " + r.durum, sinif(r.puan));
     const kod = hucre(tr, r.barkod, "kod"); kod.title = "Kopyalamak için tıkla"; kod.style.cursor = "pointer";
     kod.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(r.barkod); $("#uyari").textContent = "Kopyalandı: " + r.barkod; };
-    hucre(tr, r.ad); hucre(tr, r.marka); hucre(tr, r.kaynak); hucre(tr, r.gecerli ? "Evet" : "Hayır"); g.appendChild(tr);
+    hucre(tr, r.ad); hucre(tr, r.marka); const kt = hucre(tr, r.kaynak); if (r.url) { kt.title = r.url; kt.textContent = r.kaynak + " ↗"; kt.style.cursor = "pointer"; kt.onclick = () => window.open(r.url, "_blank", "noopener"); } hucre(tr, r.gecerli ? "Evet" : "Hayır"); g.appendChild(tr);
   }
   $("#sonucTablo").hidden = !d.sonuclar.length;
   $("#uyari").textContent = (d.sonuclar.length ? d.sonuclar.length + " sonuç.\n" : "Sonuç yok.\n") + (d.hatalar.length ? "Uyarılar:\n" + d.hatalar.join("\n") : "");
@@ -386,7 +390,7 @@ const hStr = (c) => String(c == null ? "" : c).trim();
 
 // ---------- 4) toplu arama
 let dur = false, sonSatirlar = [], dosyaTablo = null;
-const YENI_BASLIK = ["Barkod", "Durum", "Bulunan Ürün", "Skor", "Kaynak", "Alternatif"];
+const YENI_BASLIK = ["Barkod", "Durum", "Bulunan Ürün", "Skor", "Kaynak", "Kaynak Sayfa", "Alternatif"];
 
 function tabloyuHazirla(satirlar) {
   satirlar = bosDegil(satirlar);
@@ -412,7 +416,7 @@ function metindenListele(m) { return m.split(/\r?\n/).map((s) => s.split(/[\t;]/
 
 function satirCiz(i) {
   const s = sonSatirlar[i], tr = s.tr; tr.replaceChildren();
-  hucre(tr, s.ad); hucre(tr, s.barkod, "kod"); hucre(tr, s.bulunan); hucre(tr, s.puan, s.barkod ? sinif(s.puan) : ""); hucre(tr, s.durum); hucre(tr, s.kaynak);
+  hucre(tr, s.ad); hucre(tr, s.barkod, "kod"); hucre(tr, s.bulunan); hucre(tr, s.puan, s.barkod ? sinif(s.puan) : ""); hucre(tr, s.durum); const kt = hucre(tr, s.kaynak); if (s.url) { kt.title = s.url; kt.textContent = s.kaynak + " ↗"; kt.style.cursor = "pointer"; kt.onclick = () => window.open(s.url, "_blank", "noopener"); }
   const td = hucre(tr, "");
   if (s.barkod && s.durum === "Kontrol et") {
     const b = document.createElement("button"); b.className = "kucuk"; b.textContent = "Onayla";
@@ -450,7 +454,7 @@ $("#topluBtn").addEventListener("click", async () => {
     d.hatalar.forEach((h) => hataOzet.add(h));
     const en = d.sonuclar.find((r) => r.durum !== "Bulunamadı"), alt = d.sonuclar.filter((r) => r !== en).slice(0, 2).map((a) => a.barkod + " - " + a.ad + " (" + a.puan + ")").join(" | ");
     const tr = document.createElement("tr"); $("#topluGovde").appendChild(tr);
-    sonSatirlar.push(en ? { ad: k.ad, satir: k.satir, barkod: en.barkod, bulunan: en.ad, puan: en.puan, durum: en.durum, kaynak: en.kaynak, alt, tr }
+    sonSatirlar.push(en ? { ad: k.ad, satir: k.satir, barkod: en.barkod, bulunan: en.ad, puan: en.puan, durum: en.durum, kaynak: en.kaynak, url: en.url, alt, tr }
                          : { ad: k.ad, satir: k.satir, barkod: "", bulunan: "", puan: "", durum: "Bulunamadı", kaynak: "", alt, tr });
     satirCiz(sonSatirlar.length - 1); $("#ilerleme").value = i + 1;
   }
@@ -464,10 +468,10 @@ $("#durBtn").addEventListener("click", () => { dur = true; });
 
 function ciktiSatirlari() {
   const bas = dosyaTablo && dosyaTablo.veri.length ? dosyaTablo.bas : ["Ürün Adı"];
-  const satirlar = sonSatirlar.map((s) => [...s.satir.map((c) => (c == null ? "" : c)), s.barkod, s.durum, s.bulunan, s.puan, s.kaynak, s.alt]);
+  const satirlar = sonSatirlar.map((s) => [...s.satir.map((c) => (c == null ? "" : c)), s.barkod, s.durum, s.bulunan, s.puan, s.kaynak, s.url || "", s.alt]);
   const uzun = Math.max(bas.length, ...satirlar.map((s) => s.length - YENI_BASLIK.length));
   const dolgu = (a, n) => { a = a.slice(); while (a.length < n) a.push(""); return a; };
-  return [[...dolgu(bas, uzun), ...YENI_BASLIK], ...sonSatirlar.map((s) => [...dolgu(s.satir.map((c) => (c == null ? "" : c)), uzun), s.barkod, s.durum, s.bulunan, s.puan, s.kaynak, s.alt])];
+  return [[...dolgu(bas, uzun), ...YENI_BASLIK], ...sonSatirlar.map((s) => [...dolgu(s.satir.map((c) => (c == null ? "" : c)), uzun), s.barkod, s.durum, s.bulunan, s.puan, s.kaynak, s.url || "", s.alt])];
 }
 function dosyaIndir(blob, ad) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = ad; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
 function csvMetni(rows, barkodKolonlari) {
