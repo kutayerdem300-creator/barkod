@@ -139,16 +139,7 @@ async function webAra(p) {
   };
 }
 
-async function sonda(p) {   // GEÇİCİ tanılama: bir adrese sunucudan istek atıp ne döndüğünü gösterir
-  if (!/^https?:\/\//.test(p.url)) throw new Error("url yok");
-  const r = await fetch(p.url, { headers: { "User-Agent": UA, "Accept-Language": "tr-TR,tr;q=0.9", Accept: "text/html,application/json" }, redirect: "follow", signal: AbortSignal.timeout(7000) });
-  const t = (await r.text()).slice(0, 600000);
-  const eans = [...new Set((t.match(/\b\d{13}\b/g) || []))].filter(gecerliEan).slice(0, 8);
-  return { durum: r.status, boyut: t.length, bas: t.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 300), eans, baglar: [...new Set([...t.matchAll(/href="(https?:[^"]+)"/g)].map((m) => m[1]))].slice(0, 12) };
-}
-
 const KAYNAKLAR = {
-  sonda,
   ean: async (p) => {
     const token = (process.env.EAN_SEARCH_TOKEN || "").trim();
     if (!token) return { atlandi: "EAN_SEARCH_TOKEN tanımlı değil (atlandı)" };
@@ -194,8 +185,8 @@ exports.handler = async (event) => {
   const p = event.queryStringParameters || {};
   const kaynak = KAYNAKLAR[p.kaynak];
   if (!kaynak) return cevap(400, { hata: "Bilinmeyen kaynak." });
-  const girdi = { url: (p.url || "").slice(0, 400), q: (p.q || "").trim().slice(0, 200), marka: (p.marka || "").trim().slice(0, 60), kod: (p.kod || "").trim().slice(0, 120) };
-  if (p.kaynak !== "sonda" && !girdi.q && !(girdi.marka && girdi.kod)) return cevap(400, { hata: "Aranacak ürün adı boş." });
+  const girdi = { q: (p.q || "").trim().slice(0, 200), marka: (p.marka || "").trim().slice(0, 60), kod: (p.kod || "").trim().slice(0, 120) };
+  if (!girdi.q && !(girdi.marka && girdi.kod)) return cevap(400, { hata: "Aranacak ürün adı boş." });
   try {
     return cevap(200, await kaynak(girdi));
   } catch (e) {
