@@ -9,14 +9,15 @@
   @media (prefers-color-scheme: dark) { :root { --bg:#12161c; --kart:#1b212a; --yazi:#e8ecf1; --soluk:#9aa6b5; --cizgi:#2d3643; --ana:#5b9bd5; --iyi:#4ade80; --orta:#fbbf24; --kotu:#f87171; } }
   * { box-sizing:border-box; }
   body { margin:0; font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--yazi); }
-  main { max-width:1040px; margin:0 auto; padding:16px; }
+  main { max-width:1100px; margin:0 auto; padding:16px; }
   h1 { font-size:20px; margin:4px 0 4px; } h2 { font-size:16px; margin:0 0 8px; }
   .kart { background:var(--kart); border:1px solid var(--cizgi); border-radius:10px; padding:14px; margin-bottom:14px; }
   .satir { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
   input[type=text], input[type=password], textarea { flex:1; min-width:0; padding:10px; border:1px solid var(--cizgi); border-radius:8px; background:transparent; color:inherit; font:inherit; }
-  textarea { width:100%; min-height:120px; resize:vertical; }
+  textarea { width:100%; min-height:110px; resize:vertical; }
   button { padding:10px 14px; border:0; border-radius:8px; background:var(--ana); color:#fff; font:inherit; cursor:pointer; }
   button.ikincil { background:transparent; color:var(--ana); border:1px solid var(--ana); }
+  button.kucuk { padding:4px 8px; font-size:13px; }
   button:disabled { opacity:.5; cursor:default; }
   label { display:inline-flex; gap:5px; align-items:center; margin-right:10px; }
   .soluk { color:var(--soluk); font-size:13px; }
@@ -24,21 +25,21 @@
   table { width:100%; border-collapse:collapse; font-size:14px; }
   th, td { text-align:left; padding:7px 6px; border-bottom:1px solid var(--cizgi); vertical-align:top; }
   th { font-size:12px; color:var(--soluk); font-weight:600; white-space:nowrap; }
-  td.kod { font-family:ui-monospace,Consolas,monospace; cursor:pointer; white-space:nowrap; }
+  td.kod { font-family:ui-monospace,Consolas,monospace; white-space:nowrap; }
+  td input.elle { width:150px; padding:4px 6px; font-family:ui-monospace,Consolas,monospace; }
   .iyi { color:var(--iyi); font-weight:600; } .orta { color:var(--orta); font-weight:600; } .kotu { color:var(--kotu); font-weight:600; }
   progress { width:100%; height:10px; }
-  #uyari, #topluNot { white-space:pre-wrap; font-size:13px; margin-top:8px; }
+  #uyari, #topluNot, #hafizaNot { white-space:pre-wrap; font-size:13px; margin-top:8px; }
   #uyari { color:var(--kotu); }
 </style>
 </head>
 <body>
 <main>
   <h1>Barkod Bulucu</h1>
-  <p class="soluk" style="margin:0 0 14px">Aramalar Netlify sunucusundan yapılır. Önce şifreyi yaz ve "Bağlantıyı test et"e bas.</p>
+  <p class="soluk" style="margin:0 0 14px">Ürün adından barkod bulur. Sıra: kayıtlı hafıza, tedarikçi listesi, sonra internet kaynakları. Aramalar Netlify sunucusundan yapılır.</p>
 
   <div class="kart" id="ortam" hidden style="border-color:var(--orta)">
-    <strong>Bu sayfa dosya olarak açılmış.</strong>
-    Arama sunucu fonksiyonu gerektirir; sayfayı Netlify adresinden aç (KURULUM.md).
+    <strong>Bu sayfa dosya olarak açılmış.</strong> Arama sunucu fonksiyonu gerektirir; sayfayı Netlify adresinden aç.
   </div>
 
   <div class="kart">
@@ -53,16 +54,22 @@
   </div>
 
   <div class="kart">
-    <h2>2) Tek ürün ara</h2>
+    <h2>2) Kaynaklar</h2>
+    <div>
+      <label title="Marka + üretici model koduyla birebir arar. Philips, Samsung gibi markalarda iyi."><input type="checkbox" class="kaynak" value="icecat" checked> Icecat (marka + model kodu)</label>
+      <label title="Anahtar gerekir (Netlify'da EAN_SEARCH_TOKEN). Yoksa atlanır."><input type="checkbox" class="kaynak" value="ean" checked> EAN-Search</label>
+      <label title="Ücretsiz, günlük sınırlı, yavaş"><input type="checkbox" class="kaynak" value="upc" checked> UPCitemdb</label>
+      <label title="Sadece gıda ürünleri için"><input type="checkbox" class="kaynak" value="off"> Open Food Facts (gıda)</label>
+    </div>
+    <div class="soluk" style="margin-top:6px">Kaynaklar sırayla denenir; model kodu birebir tutan bir sonuç bulunca durulur, diğerleri sorgulanmaz.</div>
+  </div>
+
+  <div class="kart">
+    <h2>3) Tek ürün ara</h2>
     <form class="satir" id="aramaFormu">
       <input type="text" id="q" value="Tefal FV5735 Easygliss ütü" placeholder="Ürün adı veya model kodu">
       <button type="submit" id="araBtn">Ara</button>
     </form>
-    <div style="margin-top:8px">
-      <label><input type="checkbox" class="kaynak" value="ean" checked> EAN-Search</label>
-      <label><input type="checkbox" class="kaynak" value="upc" checked> UPCitemdb</label>
-      <label><input type="checkbox" class="kaynak" value="off" checked> Open Food Facts</label>
-    </div>
     <div id="uyari"></div>
     <div class="kap"><table id="sonucTablo" hidden>
       <thead><tr><th>Skor</th><th>Barkod</th><th>Ürün adı</th><th>Marka</th><th>Kaynak</th><th>Geçerli</th></tr></thead><tbody id="sonucGovde"></tbody>
@@ -70,9 +77,9 @@
   </div>
 
   <div class="kart">
-    <h2>3) Toplu arama</h2>
-    <p class="soluk" style="margin:0 0 8px">Ürün adlarını her satıra bir tane gelecek şekilde yapıştır (Excel'den sütunu kopyalayıp yapıştırabilirsin) ya da Excel/CSV dosyası seç. Dosyada "Ürün Adı" gibi bir başlık varsa o sütun kullanılır.</p>
-    <textarea id="liste" placeholder="TEFAL FV 5735 EASYGLISS UTU&#10;TEFAL PP1061 PREMISS TARTI BEYAZ&#10;..."></textarea>
+    <h2>4) Toplu arama</h2>
+    <p class="soluk" style="margin:0 0 8px">Ürün adlarını her satıra bir tane yapıştır ya da Excel/CSV dosyası seç. Dosyada "Ürün Adı" gibi bir başlık varsa o sütun kullanılır. Sonuç, kendi sütunlarının yanına barkod eklenmiş Excel olarak iner.</p>
+    <textarea id="liste" placeholder="TEFAL FV 5735 EASYGLISS UTU&#10;PHILIPS HD9252/90 AIRFRYER&#10;..."></textarea>
     <div class="satir" style="margin-top:8px">
       <input type="file" id="dosya" accept=".xlsx,.xls,.csv,.txt">
       <label id="stokluEtiket" hidden><input type="checkbox" id="sadeceStoklu" checked> Sadece envanteri &gt; 0 olanlar</label>
@@ -80,13 +87,25 @@
     <div class="satir" style="margin-top:8px">
       <button id="topluBtn">Toplu ara</button>
       <button id="durBtn" class="ikincil" disabled>Durdur</button>
-      <button id="indirBtn" class="ikincil" disabled>CSV indir</button>
+      <button id="indirBtn" class="ikincil" disabled>Excel indir</button>
     </div>
     <div id="topluNot" class="soluk"></div>
     <progress id="ilerleme" value="0" max="1" hidden></progress>
     <div class="kap" id="topluKap" hidden><table>
-      <thead><tr><th>Aranan</th><th>Barkod</th><th>Bulunan ürün</th><th>Skor</th><th>Durum</th><th>Kaynak</th></tr></thead><tbody id="topluGovde"></tbody>
+      <thead><tr><th>Aranan</th><th>Barkod</th><th>Bulunan ürün</th><th>Skor</th><th>Durum</th><th>Kaynak</th><th>İşlem</th></tr></thead><tbody id="topluGovde"></tbody>
     </table></div>
+  </div>
+
+  <div class="kart">
+    <h2>5) Hafıza ve tedarikçi listeleri</h2>
+    <p class="soluk" style="margin:0 0 8px"><strong>Hafıza:</strong> bulunan ve onayladığın barkodlar bu tarayıcıda saklanır, aynı ürün bir daha aranmaz. <strong>Tedarikçi listesi:</strong> dağıtıcıdan aldığın Excel'i (ürün adı, model, barkod sütunları) yükle; aramalar önce buna bakar. En güvenilir kaynak budur.</p>
+    <div class="satir">
+      <label class="soluk">Tedarikçi listesi yükle <input type="file" id="tedarikDosya" accept=".xlsx,.xls,.csv"></label>
+      <button class="ikincil" id="hafizaIndir">Hafızayı indir (CSV)</button>
+      <label class="soluk">Hafıza yükle <input type="file" id="hafizaDosya" accept=".csv"></label>
+      <button class="ikincil" id="hafizaSil">Hepsini sil</button>
+    </div>
+    <div id="hafizaNot" class="soluk"></div>
   </div>
 </main>
 
@@ -96,8 +115,10 @@ const $ = (s) => document.querySelector(s);
 const TR = { "ı":"i","İ":"i","ş":"s","Ş":"s","ğ":"g","Ğ":"g","ü":"u","Ü":"u","ö":"o","Ö":"o","ç":"c","Ç":"c" };
 const trSade = (s) => String(s || "").replace(/[ıİşŞğĞüÜöÖçÇ]/g, (c) => TR[c]);
 const norm = (s) => trSade(s).toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
+const anahtar = (s) => norm(s).join(" ");
+const bekle = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ---------- puanlama (masaüstü programıyla aynı mantık)
+// ---------- puanlama
 function bigrams(s) { const g = []; for (let i = 0; i < s.length - 1; i++) g.push(s.slice(i, i + 2)); return g; }
 function dice(a, b) {
   if (a.length < 2 || b.length < 2) return a === b ? 1 : 0;
@@ -118,113 +139,213 @@ function eanGecerli(k) {
   const d = k.split("").map(Number), c = d.pop();
   return (10 - (d.reverse().reduce((t, x, i) => t + x * (i % 2 === 0 ? 3 : 1), 0) % 10)) % 10 === c;
 }
-function barkodDuzelt(k) { k = String(k || "").replace(/\D/g, ""); return [8, 13, 14].includes(k.length) ? k : k ? k.padStart(13, "0") : ""; }
+function barkodDuzelt(k) { k = String(k == null ? "" : k).replace(/\D/g, ""); return [8, 13, 14].includes(k.length) ? k : k ? k.padStart(13, "0") : ""; }
+
+// ---------- marka ve model kodu çıkarma
 const BIRIM = /^\d+([A-Z]{1,4}|X\d+)$/;   // 1500W, 26X26 gibi ölçü/güç ifadeleri model kodu değildir
+const KOD_DEGIL = ["PRO", "MAX", "TEK", "SET", "PRC", "XXL", "PCS"];
 function modelKodlari(m) {
   const u = trSade(m).toUpperCase(), k = new Set();
   for (const p of u.match(/[A-Z0-9]+/g) || []) if (p.length >= 5 && /[A-Z]/.test(p) && /\d/.test(p) && !BIRIM.test(p)) k.add(p);
   for (const x of u.matchAll(/\b([A-Z]{2,3})\s?-?(\d[A-Z0-9]{2,6})\b/g)) {
-    if (["PRO", "MAX", "TEK", "SET", "PRC", "XXL", "PCS"].includes(x[1])) continue;   // "PRO 1000 W" model kodu değil
+    if (KOD_DEGIL.includes(x[1])) continue;
     if ((/\d.*\d|\d[A-Z]/.test(x[2])) && !BIRIM.test(x[2]) && (x[1] + x[2]).length >= 5) k.add(x[1] + x[2]);
   }
   return k;
 }
+// Yazıldığı gibi kodlar (HD9252/90 gibi eğik çizgili biçimler için); Icecat bu biçimi ister
+function hamKodlar(m) {
+  const u = trSade(m).toUpperCase(), s = [];
+  for (const t of u.match(/[A-Z0-9][A-Z0-9\-\/.]*[A-Z0-9]/g) || []) {
+    if (t.length >= 5 && /[A-Z]/.test(t) && /\d/.test(t) && !BIRIM.test(t) && !KOD_DEGIL.includes(t)) s.push(t);
+  }
+  return s;
+}
+const MARKALAR = ["arzum","tefal","philips","samsung","bosch","siemens","braun","rowenta","krups","moulinex","fakir","karaca","beko","arcelik","vestel","lg","sony","xiaomi","dyson","delonghi","kenwood","electrolux","grundig","remington","babyliss","sinbo","goldmaster","hp","lenovo","dell","asus","acer","apple","huawei","oppo","jbl","logitech","kitchenaid","sharp","panasonic","tcl","hisense","regal","altus","profilo","ariston","vaillant","baymak","fantom","luxell","simfer","franke","korkmaz","emsan","schafer","homend","tefal","wmf","zwilling","lg","nikon","canon","epson","brother","garmin","anker","tp-link","tplink","casio","seiko","oral-b","gillette","wahl","ufesa","gorenje","miele","smeg","hotpoint","indesit","whirlpool","candy","haier","midea","xiaomi","realme","poco","redmi","nokia","motorola","playstation","nintendo","microsoft","bellona","istikbal","yatas","tempur"];
+const MARKA_GOSTER = { arcelik: "Arçelik", delonghi: "DeLonghi", istikbal: "İstikbal", tplink: "TP-Link", "tp-link": "TP-Link", lg: "LG", hp: "HP", jbl: "JBL", tcl: "TCL", wmf: "WMF" };
+function markaBul(ad) {
+  const t = norm(ad), birlesik = " " + t.join(" ") + " ";
+  if (birlesik.includes(" de longhi ")) return "DeLonghi";
+  if (birlesik.includes(" oral b ")) return "Oral-B";
+  const b = t.find((x) => MARKALAR.includes(x));
+  return b ? (MARKA_GOSTER[b] || b[0].toUpperCase() + b.slice(1)) : "";
+}
+function urunCoz(ad) {
+  const kodlar = [...modelKodlari(ad)].sort((a, b) => b.length - a.length);
+  const ham = [...new Set([...hamKodlar(ad), ...kodlar])].sort((a, b) => b.length - a.length).slice(0, 3);
+  const marka = markaBul(ad);
+  return { ad, marka, kodlar, ham, sorgu: kodlar.length ? ((marka ? marka + " " : "") + kodlar[0]) : "" };
+}
 
-// ---------- kaynaklar (Netlify fonksiyonu üzerinden)
-// Not: fetch'e AbortSignal verilmez; bazı köprülü ortamlar bunu kabul etmiyor.
-async function sunucu(kaynak, q, sifre) {
+// ---------- sunucu çağrısı
+async function sunucu(kaynak, ctxObj, sifre) {
   let zamanlayici;
   const zaman = new Promise((_, ret) => { zamanlayici = setTimeout(() => ret(new Error("Zaman aşımı (25 sn)")), 25000); });
   try {
-    const r = await Promise.race([fetch("/.netlify/functions/ara?" + new URLSearchParams({ kaynak, q }), { headers: { "x-sifre": sifre } }), zaman]);
-    if (r.status === 404) throw new Error("Sunucu fonksiyonu bulunamadı. Site GitHub veya Netlify CLI ile yüklenmemiş olabilir (KURULUM.md).");
+    const p = { kaynak }; for (const [k, v] of Object.entries(ctxObj)) if (v) p[k] = v;
+    // Not: fetch'e AbortSignal verilmez; bazı köprülü ortamlar bunu kabul etmiyor.
+    const r = await Promise.race([fetch("/.netlify/functions/ara?" + new URLSearchParams(p), { headers: { "x-sifre": sifre } }), zaman]);
+    if (r.status === 404) throw new Error("Sunucu fonksiyonu bulunamadı. Site GitHub ile yüklenmemiş olabilir.");
     let v = null; try { v = await Promise.race([r.json(), zaman]); } catch (x) {}
     if (r.status === 401) throw new Error("Şifre yanlış.");
     if (!r.ok) throw new Error((v && v.hata) || ("HTTP " + r.status));
     if (v && v.atlandi) throw new Error(v.atlandi);
     if (v && v.hata) throw new Error(v.hata);
-    return v.sonuclar || [];
+    return (v && v.sonuclar) || [];
   } catch (e) {
     if (e instanceof TypeError) throw new Error("Sunucuya ulaşılamadı. Sayfa Netlify adresinden mi açık? İnternet var mı?");
     throw e;
   } finally { clearTimeout(zamanlayici); }
 }
-const KAYNAK = {
-  ean: { ad: "EAN-Search", aralik: 400, test: "nutella", async ara(q, ctx) { return (await sunucu("ean", q, ctx.sifre)).map((r) => ({ ...r, barkod: barkodDuzelt(r.barkod) })); } },
-  upc: { ad: "UPCitemdb", aralik: 10500, test: "tefal fv5735", async ara(q, ctx) { return (await sunucu("upc", q, ctx.sifre)).map((r) => ({ ...r, barkod: barkodDuzelt(r.barkod) })); } },
-  off: { ad: "Open Food Facts", aralik: 6500, test: "nutella", async ara(q, ctx) { return (await sunucu("off", q, ctx.sifre)).map((r) => ({ ...r, barkod: barkodDuzelt(r.barkod) })); } },
-};
+// Kaynak başına hız sınırı (ücretsiz kaynaklar sık sorguya izin vermez)
+const sonraki = {}, kapali = {};
+async function slot(k) {
+  const simdi = Date.now(), t = Math.max(simdi, sonraki[k] || 0);
+  sonraki[k] = t + KAYNAK[k].aralik;
+  if (t > simdi) await bekle(t - simdi);
+}
 const ctx = () => ({ sifre: $("#token").value });
-const secili = () => [...document.querySelectorAll(".kaynak:checked")].map((c) => c.value);
+async function cagri(k, girdi) { await slot(k); return sunucu(k, girdi, ctx().sifre); }
 
-// Bir sonucu aranan ürünle karşılaştırır. Otomatik sadece model kodu birebir tutuyorsa; ad benzerliği tek başına yetmez
-// (renk, boyut, ülke varyantı farklı olabilir).
-function degerlendir(q, r) {
-  const s = skor(q, (r.marka + " " + r.ad).trim());
-  const qk = modelKodlari(q), rk = modelKodlari(r.marka + " " + r.ad);
+const kodOrtak = (u, r) => { const rk = modelKodlari(r.marka + " " + r.ad); return u.kodlar.some((k) => rk.has(k) || [...rk].some((c) => k.length >= 6 && c.startsWith(k))); };
+const KAYNAK = {
+  icecat: { ad: "Icecat", aralik: 300, test: { q: "Philips HD9252/90", marka: "Philips", kod: "HD9252/90" },
+    async bul(u) {
+      if (!u.marka || !u.ham.length) return [];
+      for (const kod of u.ham) { const r = await cagri("icecat", { marka: u.marka, kod }); if (r.length) return r.map((x) => ({ ...x, kesin: true })); }
+      return [];
+    } },
+  ean: { ad: "EAN-Search", aralik: 400, test: { q: "nutella" },
+    async bul(u) {
+      let tum = [];
+      if (u.sorgu) { tum = await cagri("ean", { q: u.sorgu }); if (tum.some((r) => kodOrtak(u, r))) return tum; }
+      return tum.concat(await cagri("ean", { q: u.ad }));
+    } },
+  upc: { ad: "UPCitemdb", aralik: 10500, test: { q: "nutella" },
+    async bul(u) {
+      let tum = [];
+      if (u.sorgu) { tum = await cagri("upc", { q: u.sorgu }); if (tum.some((r) => kodOrtak(u, r))) return tum; }
+      return tum.concat(await cagri("upc", { q: u.ad }));
+    } },
+  off: { ad: "Open Food Facts", aralik: 6500, test: { q: "nutella" }, async bul(u) { return cagri("off", { q: u.ad }); } },
+};
+const SIRA = ["icecat", "ean", "upc", "off"];
+
+// ---------- değerlendirme
+function degerlendir(u, r) {
+  if (r.kesin) return { puan: 95, otomatikMumkun: true };
+  const s = skor(u.ad, (r.marka + " " + r.ad).trim()), rk = modelKodlari(r.marka + " " + r.ad), qk = new Set(u.kodlar);
   const tam = [...qk].some((k) => rk.has(k));
   const onek = !tam && [...qk].some((k) => k.length >= 6 && [...rk].some((c) => c.startsWith(k)));
-  let puan, otomatikMumkun = false;
-  if (tam) { puan = Math.round(70 + 0.3 * s); otomatikMumkun = true; }
-  else if (onek) puan = Math.min(84, Math.round(70 + 0.3 * s));
-  else if (qk.size && rk.size) puan = Math.round(0.4 * s);          // farklı model kodu
-  else puan = Math.min(84, s);                                       // sadece ad benzerliği
-  return { puan, otomatikMumkun };
+  if (tam) return { puan: Math.round(70 + 0.3 * s), otomatikMumkun: true };
+  if (onek) return { puan: Math.min(84, Math.round(70 + 0.3 * s)), otomatikMumkun: false };
+  if (qk.size && rk.size) return { puan: Math.round(0.4 * s), otomatikMumkun: false };   // farklı model kodu
+  return { puan: Math.min(84, s), otomatikMumkun: false };                                  // sadece ad benzerliği
 }
 function durumOf(puan, gecerli, otomatikMumkun) {
   if (puan >= 85 && gecerli && otomatikMumkun) return "Otomatik";
   return puan >= 55 ? "Kontrol et" : "Bulunamadı";
 }
-async function ara(q, kaynaklar) {
-  const sonuclar = await Promise.allSettled(kaynaklar.map((k) => KAYNAK[k].ara(q, ctx())));
-  const harita = new Map(), hatalar = [];
-  sonuclar.forEach((s, i) => {
-    const ad = KAYNAK[kaynaklar[i]].ad;
-    if (s.status === "rejected") { hatalar.push(ad + ": " + (s.reason && s.reason.message || s.reason)); return; }
-    for (const r of s.value) {
-      if (!r.barkod || !r.ad) continue;
-      const { puan, otomatikMumkun } = degerlendir(q, r), gecerli = eanGecerli(r.barkod);
-      const var_ = harita.get(r.barkod);
-      if (var_) { var_.kaynak += ", " + ad; if (puan > var_.puan) { var_.puan = puan; var_.otomatikMumkun = otomatikMumkun; } }
-      else harita.set(r.barkod, { ...r, kaynak: ad, puan, otomatikMumkun, gecerli });
-    }
+function aday(r, kaynak, puan, oto) { const gecerli = eanGecerli(r.barkod); return { barkod: r.barkod, ad: r.ad || "", marka: r.marka || "", kaynak, puan, otomatikMumkun: oto, gecerli, durum: durumOf(puan, gecerli, oto) }; }
+
+// ---------- hafıza ve tedarikçi listesi (tarayıcıda saklanır)
+let hafiza = {}, tedarik = [], kodIdx = new Map(), adIdx = new Map();
+function depoOku(k, varsayilan) { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? varsayilan : v; } catch (e) { return varsayilan; } }
+function depoYaz(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+function tedarikIndeksle() {
+  kodIdx = new Map(); adIdx = new Map();
+  tedarik.forEach((r, i) => {
+    for (const k of modelKodlari(r.ad + " " + r.model)) { if (!kodIdx.has(k)) kodIdx.set(k, []); kodIdx.get(k).push(i); }
+    const a = anahtar(r.ad); if (a) { if (!adIdx.has(a)) adIdx.set(a, []); adIdx.get(a).push(i); }
   });
-  const liste = [...harita.values()].sort((a, b) => b.puan - a.puan || Number(b.gecerli) - Number(a.gecerli));
-  liste.forEach((r) => { r.durum = durumOf(r.puan, r.gecerli, r.otomatikMumkun); });
-  return { sonuclar: liste, hatalar };
+}
+function hafizayaKaydet(ad, r, kaynak) {
+  const a = anahtar(ad); if (!a || !r.barkod) return;
+  hafiza[a] = { ad, barkod: r.barkod, bulunan: r.ad || "", kaynak: kaynak || r.kaynak, tarih: new Date().toISOString().slice(0, 10) };
+  depoYaz("barkodHafiza", hafiza); hafizaGoster();
+}
+function hafizaGoster() { $("#hafizaNot").textContent = "Hafızada " + Object.keys(hafiza).length + " ürün, tedarikçi listesinde " + tedarik.length + " satır var."; }
+function tedarikAra(u) {
+  const idx = new Set();
+  for (const k of u.kodlar) (kodIdx.get(k) || []).forEach((i) => idx.add(i));
+  const kodlu = idx.size > 0;
+  if (!kodlu) (adIdx.get(anahtar(u.ad)) || []).forEach((i) => idx.add(i));
+  const barkodlar = new Map();
+  for (const i of idx) { const r = tedarik[i]; if (r.barkod && !barkodlar.has(r.barkod)) barkodlar.set(r.barkod, r); }
+  const tek = barkodlar.size === 1;
+  return [...barkodlar.values()].map((r) => {
+    const a = aday({ barkod: r.barkod, ad: r.ad, marka: "" }, "Tedarikçi listesi", kodlu ? 98 : 92, tek);
+    if (!tek && a.durum === "Otomatik") a.durum = "Kontrol et";   // aynı kodla birden çok barkod: insan baksın
+    return a;
+  });
 }
 
-// ---------- ortak arayüz yardımcıları
+// ---------- tek ürün için kademeli arama
+async function araUrun(ad, kaynaklar, durdur) {
+  const u = urunCoz(ad), adaylar = new Map(), hatalar = new Set();
+  const ekle = (a) => { const v = adaylar.get(a.barkod); if (v) { v.kaynak += ", " + a.kaynak; if (a.puan > v.puan) Object.assign(v, { puan: a.puan, otomatikMumkun: a.otomatikMumkun, durum: a.durum }); } else adaylar.set(a.barkod, a); };
+  const sirali = () => [...adaylar.values()].sort((a, b) => b.puan - a.puan || Number(b.gecerli) - Number(a.gecerli));
+  const bitir = () => ({ sonuclar: sirali(), hatalar: [...hatalar], u });
+
+  const h = hafiza[anahtar(ad)];
+  if (h) { ekle({ barkod: h.barkod, ad: h.bulunan || h.ad, marka: "", kaynak: "Hafıza", puan: 99, otomatikMumkun: true, gecerli: eanGecerli(h.barkod), durum: "Otomatik" }); return bitir(); }
+
+  tedarikAra(u).forEach(ekle);
+  if (sirali().some((a) => a.durum === "Otomatik")) return bitir();
+
+  for (const k of SIRA.filter((x) => kaynaklar.includes(x))) {
+    if (durdur && durdur()) break;
+    if (kapali[k]) continue;
+    try {
+      for (const r of await KAYNAK[k].bul(u)) {
+        if (!r.barkod || !r.ad) continue;
+        const { puan, otomatikMumkun } = degerlendir(u, r);
+        ekle(aday(r, KAYNAK[k].ad, puan, otomatikMumkun));
+      }
+    } catch (e) {
+      const m = String(e && e.message || e);
+      hatalar.add(KAYNAK[k].ad + ": " + m);
+      if (/atlandı|limit doldu|Şifre yanlış|bulunamadı\./i.test(m)) kapali[k] = m;   // bu oturumda tekrar deneme
+    }
+    if (sirali().some((a) => a.durum === "Otomatik")) break;
+  }
+  const en = sirali().find((a) => a.durum === "Otomatik");
+  if (en && en.kaynak.indexOf("Hafıza") < 0) hafizayaKaydet(ad, en, en.kaynak);
+  return bitir();
+}
+const secili = () => [...document.querySelectorAll(".kaynak:checked")].map((c) => c.value);
+
+// ---------- arayüz yardımcıları
 const sinif = (p) => (p >= 75 ? "iyi" : p >= 55 ? "orta" : "kotu");
 function hucre(tr, metin, cls) { const td = document.createElement("td"); td.textContent = metin == null ? "" : metin; if (cls) td.className = cls; tr.appendChild(td); return td; }
-const bekle = (ms) => new Promise((r) => setTimeout(r, ms));
 if (location.protocol === "file:") $("#ortam").hidden = false;
 try { $("#token").value = localStorage.getItem("barkodSifre") || ""; } catch (e) {}
 $("#token").addEventListener("change", () => { try { localStorage.setItem("barkodSifre", $("#token").value); } catch (e) {} });
+hafiza = depoOku("barkodHafiza", {}); tedarik = depoOku("barkodTedarik", []); tedarikIndeksle(); hafizaGoster();
 
 // ---------- 1) bağlantı testi
 $("#testBtn").addEventListener("click", async () => {
   $("#testBtn").disabled = true; $("#testTablo").hidden = false; const g = $("#testGovde"); g.replaceChildren();
-  await Promise.all(Object.keys(KAYNAK).map(async (k) => {
+  await Promise.all(SIRA.map(async (k) => {
     const tr = document.createElement("tr"); hucre(tr, KAYNAK[k].ad); const d = hucre(tr, "Deneniyor…"), s = hucre(tr, ""), a = hucre(tr, ""); g.appendChild(tr);
     const t0 = performance.now();
-    try { const r = await KAYNAK[k].ara(KAYNAK[k].test, ctx()); d.textContent = "ÇALIŞIYOR"; d.className = "iyi"; a.textContent = r.length + " sonuç döndü"; }
+    try { const r = await sunucu(k, KAYNAK[k].test, ctx().sifre); d.textContent = "ÇALIŞIYOR"; d.className = "iyi"; a.textContent = r.length + " sonuç döndü"; }
     catch (e) { d.textContent = /atlandı/.test(e.message) ? "ATLANDI" : "HATA"; d.className = /atlandı/.test(e.message) ? "orta" : "kotu"; a.textContent = e.message; }
     s.textContent = Math.round(performance.now() - t0) + " ms";
   }));
   $("#testBtn").disabled = false;
 });
 
-// ---------- 2) tek arama
+// ---------- 3) tek arama
 $("#aramaFormu").addEventListener("submit", async (e) => {
   e.preventDefault();
   const q = $("#q").value.trim(); if (!q || !secili().length) return;
   $("#araBtn").disabled = true; $("#uyari").textContent = "Aranıyor…";
-  const d = await ara(q, secili()); const g = $("#sonucGovde"); g.replaceChildren();
+  const d = await araUrun(q, secili()); const g = $("#sonucGovde"); g.replaceChildren();
   for (const r of d.sonuclar) {
     const tr = document.createElement("tr");
     hucre(tr, r.puan + " · " + r.durum, sinif(r.puan));
-    const kod = hucre(tr, r.barkod, "kod"); kod.title = "Kopyalamak için tıkla";
+    const kod = hucre(tr, r.barkod, "kod"); kod.title = "Kopyalamak için tıkla"; kod.style.cursor = "pointer";
     kod.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(r.barkod); $("#uyari").textContent = "Kopyalandı: " + r.barkod; };
     hucre(tr, r.ad); hucre(tr, r.marka); hucre(tr, r.kaynak); hucre(tr, r.gecerli ? "Evet" : "Hayır"); g.appendChild(tr);
   }
@@ -233,12 +354,9 @@ $("#aramaFormu").addEventListener("submit", async (e) => {
   $("#araBtn").disabled = false;
 });
 
-// ---------- 3) toplu arama
-let dur = false, sonSatirlar = [], dosyaSatirlari = null;
-const BASLIK = ["Aranan Ürün", "Barkod", "Bulunan Ürün", "Marka", "Skor", "Durum", "Kaynak", "Barkod Geçerli", "Alternatif 1", "Alternatif 2"];
-
+// ---------- dosya okuma
 function csvAyristir(m) {
-  const ay = (m.split("\n")[0].match(/;/g) || []).length >= (m.split("\n")[0].match(/,/g) || []).length ? ";" : ",";
+  const ilk = m.split("\n")[0], ay = (ilk.match(/;/g) || []).length >= (ilk.match(/,/g) || []).length ? ";" : ",";
   const satirlar = []; let s = [], h = "", tirnak = false;
   for (let i = 0; i < m.length; i++) {
     const c = m[i];
@@ -249,76 +367,170 @@ function csvAyristir(m) {
   if (h || s.length) { s.push(h.replace(/\r$/, "")); satirlar.push(s); }
   return satirlar;
 }
+async function xlsxHazir() {
+  if (window.XLSX) return;
+  await new Promise((ok, hata) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = ok; s.onerror = () => hata(new Error("Excel kütüphanesi indirilemedi (internet?)")); document.head.appendChild(s); });
+}
+async function dosyaOku(f) {
+  if (/\.(xlsx|xls)$/i.test(f.name)) {
+    await xlsxHazir();
+    const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: false });
+  }
+  const buf = new Uint8Array(await f.arrayBuffer());
+  let m; try { m = new TextDecoder("utf-8", { fatal: true }).decode(buf); } catch (x) { m = new TextDecoder("windows-1254").decode(buf); }
+  return /\.txt$/i.test(f.name) ? m.split(/\r?\n/).map((x) => [x]) : csvAyristir(m.replace(/^﻿/, ""));
+}
+const bosDegil = (satirlar) => satirlar.filter((s) => s.some((c) => String(c == null ? "" : c).trim()));
+const hStr = (c) => String(c == null ? "" : c).trim();
+
+// ---------- 4) toplu arama
+let dur = false, sonSatirlar = [], dosyaTablo = null;
+const YENI_BASLIK = ["Barkod", "Durum", "Bulunan Ürün", "Skor", "Kaynak", "Alternatif"];
+
 function tabloyuHazirla(satirlar) {
-  satirlar = satirlar.filter((s) => s.some((c) => String(c == null ? "" : c).trim()));
-  if (!satirlar.length) return [];
-  const bas = satirlar[0].map((c) => String(c == null ? "" : c));
-  const adKol = bas.findIndex((h) => /^(ürün|urun)?\s*(adı|adi|ad|tanımı|tanimi|açıklaması|aciklamasi)$|ürün adı|urun adi|^name$|^isim$|açıklama|aciklama/i.test(h.trim()));
+  satirlar = bosDegil(satirlar);
+  if (!satirlar.length) return { bas: [], veri: [], stokVar: false };
+  const bas = satirlar[0].map(hStr);
+  const adKol = bas.findIndex((h) => /^(ürün|urun)?\s*(adı|adi|ad|tanımı|tanimi|açıklaması|aciklamasi)$|ürün adı|urun adi|^name$|^isim$|açıklama|aciklama/i.test(h));
   const stokKol = bas.findIndex((h) => /toplam\s*envanter/i.test(h));
   const basVar = adKol >= 0, k = basVar ? adKol : 0;
-  const veri = (basVar ? satirlar.slice(1) : satirlar).map((s) => ({ ad: String(s[k] == null ? "" : s[k]).trim(), stok: stokKol >= 0 ? Number(s[stokKol]) || 0 : null })).filter((x) => x.ad);
-  return { veri, stokVar: stokKol >= 0 };
+  const veri = (basVar ? satirlar.slice(1) : satirlar).map((s) => ({ ad: hStr(s[k]), stok: stokKol >= 0 ? Number(String(s[stokKol]).replace(",", ".")) || 0 : null, satir: s })).filter((x) => x.ad);
+  return { bas: basVar ? bas : ["Ürün Adı"], veri, stokVar: stokKol >= 0, adKolVar: basVar };
 }
-function metindenListele(m) { return m.split(/\r?\n/).map((s) => s.split(/[\t;]/)[0].trim().replace(/^"|"$/g, "")).filter(Boolean); }
-
 $("#dosya").addEventListener("change", async (e) => {
   const f = e.target.files[0]; if (!f) return;
-  $("#topluNot").textContent = "Dosya okunuyor…"; dosyaSatirlari = null; $("#stokluEtiket").hidden = true;
+  $("#topluNot").textContent = "Dosya okunuyor…"; dosyaTablo = null; $("#stokluEtiket").hidden = true;
   try {
-    let satirlar;
-    if (/\.(xlsx|xls)$/i.test(f.name)) {
-      if (!window.XLSX) await new Promise((ok, hata) => { const s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; s.onload = ok; s.onerror = () => hata(new Error("Excel okuyucu indirilemedi (internet?)")); document.head.appendChild(s); });
-      const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
-      satirlar = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "" });
-    } else {
-      const buf = new Uint8Array(await f.arrayBuffer());
-      let m; try { m = new TextDecoder("utf-8", { fatal: true }).decode(buf); } catch (x) { m = new TextDecoder("windows-1254").decode(buf); }
-      satirlar = /\.txt$/i.test(f.name) ? m.split(/\r?\n/).map((x) => [x]) : csvAyristir(m.replace(/^﻿/, ""));
-    }
-    const t = tabloyuHazirla(satirlar); dosyaSatirlari = t.veri;
+    const t = tabloyuHazirla(await dosyaOku(f)); dosyaTablo = t;
     $("#liste").value = t.veri.map((x) => x.ad).join("\n");
     $("#stokluEtiket").hidden = !t.stokVar;
     $("#topluNot").textContent = t.veri.length + " ürün okundu" + (t.stokVar ? " (envanter sütunu bulundu; istersen sadece stoklu olanları ara)." : ".");
   } catch (err) { $("#topluNot").textContent = "Dosya okunamadı: " + err.message + "\nİstersen Excel'deki ürün adı sütununu kopyalayıp kutuya yapıştır."; }
 });
+function metindenListele(m) { return m.split(/\r?\n/).map((s) => s.split(/[\t;]/)[0].trim().replace(/^"|"$/g, "")).filter(Boolean); }
+
+function satirCiz(i) {
+  const s = sonSatirlar[i], tr = s.tr; tr.replaceChildren();
+  hucre(tr, s.ad); hucre(tr, s.barkod, "kod"); hucre(tr, s.bulunan); hucre(tr, s.puan, s.barkod ? sinif(s.puan) : ""); hucre(tr, s.durum); hucre(tr, s.kaynak);
+  const td = hucre(tr, "");
+  if (s.barkod && s.durum === "Kontrol et") {
+    const b = document.createElement("button"); b.className = "kucuk"; b.textContent = "Onayla";
+    b.onclick = () => { s.durum = "Onaylandı"; hafizayaKaydet(s.ad, { barkod: s.barkod, ad: s.bulunan }, "Onaylandı"); satirCiz(i); };
+    td.appendChild(b);
+  } else if (!s.barkod) {
+    const inp = document.createElement("input"); inp.type = "text"; inp.className = "elle"; inp.placeholder = "Barkodu elle yaz";
+    const b = document.createElement("button"); b.className = "kucuk"; b.textContent = "Kaydet";
+    b.onclick = () => {
+      const v = barkodDuzelt(inp.value);
+      if (!eanGecerli(v)) { inp.style.borderColor = "var(--kotu)"; inp.title = "Barkod geçersiz (kontrol basamağı tutmuyor)"; return; }
+      Object.assign(s, { barkod: v, durum: "Elle girildi", kaynak: "Elle", bulunan: "", puan: "" }); hafizayaKaydet(s.ad, { barkod: v, ad: "" }, "Elle"); satirCiz(i);
+    };
+    td.append(inp, b);
+  }
+}
 
 $("#topluBtn").addEventListener("click", async () => {
-  let adlar = metindenListele($("#liste").value);
-  if (dosyaSatirlari && $("#sadeceStoklu").checked && !$("#stokluEtiket").hidden) {
-    const var_ = new Set(dosyaSatirlari.filter((x) => x.stok > 0).map((x) => x.ad)); adlar = adlar.filter((a) => var_.has(a));
-  }
-  const kaynaklar = secili(); if (!adlar.length || !kaynaklar.length) return;
-  const aralik = Math.max(...kaynaklar.map((k) => KAYNAK[k].aralik));
+  let kayitlar;
+  const adlar = metindenListele($("#liste").value);
+  if (dosyaTablo && dosyaTablo.veri.length) {
+    let v = dosyaTablo.veri;
+    if ($("#sadeceStoklu").checked && !$("#stokluEtiket").hidden) v = v.filter((x) => x.stok > 0);
+    const kume = new Set(adlar); kayitlar = v.filter((x) => kume.has(x.ad));
+  } else kayitlar = adlar.map((ad) => ({ ad, satir: [ad] }));
+  const kaynaklar = secili(); if (!kayitlar.length || !kaynaklar.length) return;
   dur = false; sonSatirlar = [];
   $("#topluBtn").disabled = true; $("#durBtn").disabled = false; $("#indirBtn").disabled = true;
-  $("#ilerleme").hidden = false; $("#ilerleme").max = adlar.length; $("#ilerleme").value = 0;
+  $("#ilerleme").hidden = false; $("#ilerleme").max = kayitlar.length; $("#ilerleme").value = 0;
   $("#topluKap").hidden = false; $("#topluGovde").replaceChildren();
-  const dk = Math.max(1, Math.round(adlar.length * aralik / 60000));
-  $("#topluNot").textContent = adlar.length + " ürün aranacak. Tahmini süre ~" + dk + " dk (ücretsiz kaynakların hız sınırı yüzünden). Bu sekmeyi kapatma.";
-  let hataOzet = new Set();
-  for (let i = 0; i < adlar.length && !dur; i++) {
-    const t0 = Date.now(), ad = adlar[i], d = await ara(ad, kaynaklar);
+  $("#topluNot").textContent = kayitlar.length + " ürün aranıyor. Hafızada ve tedarikçi listesinde olanlar anında gelir; internet kaynakları yavaş olabilir. Bu sekmeyi kapatma.";
+  const hataOzet = new Set();
+  for (let i = 0; i < kayitlar.length && !dur; i++) {
+    const k = kayitlar[i], d = await araUrun(k.ad, kaynaklar, () => dur);
     d.hatalar.forEach((h) => hataOzet.add(h));
-    const en = d.sonuclar.find((r) => r.durum !== "Bulunamadı"), alt = d.sonuclar.filter((r) => r !== en).slice(0, 2).map((a) => a.barkod + " - " + a.ad + " (" + a.puan + ")");
-    const satir = en ? [ad, en.barkod, en.ad, en.marka, en.puan, en.durum, en.kaynak, en.gecerli ? "Evet" : "Hayır", alt[0] || "", alt[1] || ""]
-                     : [ad, "", "", "", "", "Bulunamadı", d.hatalar.join("; ").slice(0, 160), "", alt[0] || "", alt[1] || ""];
-    sonSatirlar.push(satir);
-    const tr = document.createElement("tr");
-    hucre(tr, ad); hucre(tr, satir[1], "kod"); hucre(tr, satir[2]); hucre(tr, satir[4], en ? sinif(en.puan) : ""); hucre(tr, satir[5]); hucre(tr, satir[6]);
-    $("#topluGovde").appendChild(tr); $("#ilerleme").value = i + 1;
-    const gecen = Date.now() - t0; if (i < adlar.length - 1 && !dur && gecen < aralik) await bekle(aralik - gecen);
+    const en = d.sonuclar.find((r) => r.durum !== "Bulunamadı"), alt = d.sonuclar.filter((r) => r !== en).slice(0, 2).map((a) => a.barkod + " - " + a.ad + " (" + a.puan + ")").join(" | ");
+    const tr = document.createElement("tr"); $("#topluGovde").appendChild(tr);
+    sonSatirlar.push(en ? { ad: k.ad, satir: k.satir, barkod: en.barkod, bulunan: en.ad, puan: en.puan, durum: en.durum, kaynak: en.kaynak, alt, tr }
+                         : { ad: k.ad, satir: k.satir, barkod: "", bulunan: "", puan: "", durum: "Bulunamadı", kaynak: "", alt, tr });
+    satirCiz(sonSatirlar.length - 1); $("#ilerleme").value = i + 1;
   }
-  const bulunan = sonSatirlar.filter((s) => s[1]).length, oto = sonSatirlar.filter((s) => s[5] === "Otomatik").length;
-  $("#topluNot").textContent = "Bitti: " + sonSatirlar.length + " üründen " + bulunan + " tanesinde barkod önerisi bulundu, " + oto + " tanesi otomatik (model kodu birebir tuttu). Diğerlerini ürünle karşılaştır." +
+  const say = (d) => sonSatirlar.filter((s) => s.durum === d).length;
+  $("#topluNot").textContent = "Bitti: " + sonSatirlar.length + " üründen " + say("Otomatik") + " otomatik, " + say("Kontrol et") + " kontrol edilecek, " + say("Bulunamadı") + " bulunamadı.\n" +
+    "Otomatik = model kodu birebir tuttu ve barkod geçerli. 'Kontrol et' satırlarında 'Onayla'ya basarsan hafızaya girer. Bulunamayanlara barkodu elle yazabilirsin." +
     (hataOzet.size ? "\nUyarılar:\n" + [...hataOzet].join("\n") : "");
   $("#topluBtn").disabled = false; $("#durBtn").disabled = true; $("#indirBtn").disabled = !sonSatirlar.length;
 });
 $("#durBtn").addEventListener("click", () => { dur = true; });
-$("#indirBtn").addEventListener("click", () => {
-  const kac = (v, i) => { v = String(v == null ? "" : v); if (i === 1 && /^\d+$/.test(v)) return '="' + v + '"'; return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
-  const csv = [BASLIK, ...sonSatirlar].map((s) => s.map(kac).join(";")).join("\r\n");
-  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
-  a.download = "barkodlar.csv"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+
+function ciktiSatirlari() {
+  const bas = dosyaTablo && dosyaTablo.veri.length ? dosyaTablo.bas : ["Ürün Adı"];
+  const satirlar = sonSatirlar.map((s) => [...s.satir.map((c) => (c == null ? "" : c)), s.barkod, s.durum, s.bulunan, s.puan, s.kaynak, s.alt]);
+  const uzun = Math.max(bas.length, ...satirlar.map((s) => s.length - YENI_BASLIK.length));
+  const dolgu = (a, n) => { a = a.slice(); while (a.length < n) a.push(""); return a; };
+  return [[...dolgu(bas, uzun), ...YENI_BASLIK], ...sonSatirlar.map((s) => [...dolgu(s.satir.map((c) => (c == null ? "" : c)), uzun), s.barkod, s.durum, s.bulunan, s.puan, s.kaynak, s.alt])];
+}
+function dosyaIndir(blob, ad) { const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = ad; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); }
+function csvMetni(rows, barkodKolonlari) {
+  const kac = (v, i) => { v = String(v == null ? "" : v); if (barkodKolonlari.includes(i) && /^\d{8,14}$/.test(v)) return '="' + v + '"'; return /[;"\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  return "﻿" + rows.map((s) => s.map(kac).join(";")).join("\r\n");
+}
+$("#indirBtn").addEventListener("click", async () => {
+  const rows = ciktiSatirlari(), bk = rows[0].length - YENI_BASLIK.length;
+  try {
+    await xlsxHazir();
+    const ws = XLSX.utils.aoa_to_sheet(rows), wb = XLSX.utils.book_new();
+    ws["!cols"] = rows[0].map((_, i) => ({ wch: i === bk ? 16 : i === bk + 2 ? 40 : 18 }));
+    XLSX.utils.book_append_sheet(wb, ws, "Barkodlar");
+    XLSX.writeFile(wb, "barkodlar.xlsx");
+  } catch (e) { dosyaIndir(new Blob([csvMetni(rows, [bk])], { type: "text/csv;charset=utf-8" }), "barkodlar.csv"); }
+});
+
+// ---------- 5) hafıza ve tedarikçi listesi
+function tedarikSatirlari(satirlar) {
+  satirlar = bosDegil(satirlar);
+  if (satirlar.length < 2) return [];
+  const bas = satirlar[0].map(hStr);
+  const bul = (re) => bas.findIndex((h) => re.test(h));
+  const bk = bul(/barkod|ean|gtin|upc/i);
+  if (bk < 0) throw new Error("Barkod/EAN sütunu bulunamadı. Başlık satırında 'Barkod' veya 'EAN' yazmalı.");
+  let ak = bul(/ürün adı|urun adi|ürün tanım|urun tanim|tanım|tanim|açıklama|aciklama|^ad$|^adı$|name|isim|malzeme/i);
+  const mk = bul(/model|mpn|üretici kodu|uretici kodu|ürün kodu|urun kodu|stok kodu/i);
+  if (ak < 0) ak = bas.findIndex((_, i) => i !== bk && i !== mk);
+  return satirlar.slice(1).map((s) => ({ ad: hStr(s[ak]), model: mk >= 0 ? hStr(s[mk]) : "", barkod: barkodDuzelt(String(s[bk]).replace(/\.0+$/, "").replace(/\s/g, "")) })).filter((r) => r.barkod && (r.ad || r.model));
+}
+function tedarikYukle(satirlar) {
+  const yeni = tedarikSatirlari(satirlar);
+  const var_ = new Set(tedarik.map((r) => r.barkod + "|" + r.ad + "|" + r.model));
+  let eklenen = 0; for (const r of yeni) { const k = r.barkod + "|" + r.ad + "|" + r.model; if (!var_.has(k)) { var_.add(k); tedarik.push(r); eklenen++; } }
+  tedarikIndeksle();
+  const kaydedildi = depoYaz("barkodTedarik", tedarik);
+  hafizaGoster();
+  return { eklenen, toplam: yeni.length, kaydedildi };
+}
+$("#tedarikDosya").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const r = await tedarikYukle(await dosyaOku(f));
+    $("#hafizaNot").textContent = r.toplam + " satır okundu, " + r.eklenen + " yeni eklendi." + (r.kaydedildi ? "" : " Uyarı: liste tarayıcıda saklanamadı (çok büyük); sayfa kapanınca kaybolur.") + "\nHafızada " + Object.keys(hafiza).length + " ürün, tedarikçi listesinde " + tedarik.length + " satır var.";
+  } catch (err) { $("#hafizaNot").textContent = "Liste okunamadı: " + err.message; }
+  e.target.value = "";
+});
+$("#hafizaIndir").addEventListener("click", () => {
+  const rows = [["Ürün Adı", "Barkod", "Bulunan Ürün", "Kaynak", "Tarih"], ...Object.values(hafiza).map((h) => [h.ad, h.barkod, h.bulunan, h.kaynak, h.tarih])];
+  dosyaIndir(new Blob([csvMetni(rows, [1])], { type: "text/csv;charset=utf-8" }), "barkod-hafiza.csv");
+});
+$("#hafizaDosya").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const s = bosDegil(await dosyaOku(f)).slice(1); let n = 0;
+    for (const r of s) { const b = barkodDuzelt(String(r[1]).replace(/^=?"?|"?$/g, "")); if (r[0] && b) { hafiza[anahtar(r[0])] = { ad: hStr(r[0]), barkod: b, bulunan: hStr(r[2]), kaynak: hStr(r[3]) || "Yüklendi", tarih: hStr(r[4]) }; n++; } }
+    depoYaz("barkodHafiza", hafiza); hafizaGoster(); $("#hafizaNot").textContent = n + " kayıt yüklendi.\n" + $("#hafizaNot").textContent;
+  } catch (err) { $("#hafizaNot").textContent = "Dosya okunamadı: " + err.message; }
+  e.target.value = "";
+});
+$("#hafizaSil").addEventListener("click", () => {
+  if (!confirm("Hafıza ve tedarikçi listesi silinsin mi?")) return;
+  hafiza = {}; tedarik = []; tedarikIndeksle(); depoYaz("barkodHafiza", hafiza); depoYaz("barkodTedarik", tedarik); hafizaGoster();
 });
 </script>
 </body>
